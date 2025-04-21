@@ -1,0 +1,27 @@
+{
+  "name": "whop-workers",
+  "version": "1.0.0",
+  "description": "Cron scripts for Whop view tracking and payment processing",
+  "scripts": {
+    "setup": "chmod +x scripts/*.sh && scripts/setup-crontab.sh",
+    "track-views": "ts-node scripts/track-views.ts",
+    "process-payments": "ts-node scripts/process-payments.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "apify-client": "^2.8.1",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.5.0",
+    "stripe": "^18.0.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/jest": "^29.5.10",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1"
+  }
+} 
