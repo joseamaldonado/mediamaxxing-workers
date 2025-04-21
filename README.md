@@ -78,8 +78,13 @@ The `setup-cron.sh` script will configure the following cron jobs:
 All jobs generate detailed logs in the `logs` directory:
 
 - `view-tracking-YYYY-MM-DD.log`: Results from the view tracking job
+- `view-tracking-error-YYYY-MM-DD.log`: Error output from the view tracking job
 - `payment-processing-YYYY-MM-DD.log`: Results from the payment processing job
-- `git-updates.log`: Information about git updates
+- `payment-processing-error-YYYY-MM-DD.log`: Error output from the payment processing job
+- `git-updates-YYYY-MM-DD.log`: Information about git updates
+- `git-updates-error-YYYY-MM-DD.log`: Error output from git update operations
+
+This dual-logging approach keeps standard output and error messages separate, making it easier to troubleshoot issues.
 
 ## Manual Execution
 
