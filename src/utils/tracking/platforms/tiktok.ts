@@ -11,6 +11,19 @@ export async function tiktokTracker(url: string): Promise<number | null> {
   try {
     console.log(`Tracking TikTok views for: ${url}`)
     
+    // Check if this is a shortened URL
+    if (url.includes('/t/')) {
+      console.log('Detected shortened TikTok URL, resolving...')
+      const resolvedUrl = await resolveShortUrl(url)
+      if (resolvedUrl) {
+        console.log(`Resolved to: ${resolvedUrl}`)
+        url = resolvedUrl
+      } else {
+        console.error('Failed to resolve shortened TikTok URL')
+        return null
+      }
+    }
+    
     // Extract video ID from URL
     const videoId = extractTikTokVideoId(url)
     if (!videoId) {
@@ -99,16 +112,81 @@ export async function tiktokTracker(url: string): Promise<number | null> {
 }
 
 /**
+ * Resolve a shortened TikTok URL to its full form
+ */
+async function resolveShortUrl(shortUrl: string): Promise<string | null> {
+  try {
+    // Use axios to follow redirects
+    const response = await axios.get(shortUrl, {
+      maxRedirects: 5,
+      validateStatus: null,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      }
+    })
+    
+    // If we got redirected, the final URL will be in response.request.res.responseUrl
+    // Note: This is a non-standard property that might not be available in all axios versions
+    const finalUrl = response.request?.res?.responseUrl || 
+                     response.request?.responseURL || 
+                     response.headers?.location
+    
+    if (finalUrl) {
+      return finalUrl
+    }
+    
+    // If we can't get the final URL directly, try parsing from the page
+    if (response.status === 200 && response.data) {
+      const $ = cheerio.load(response.data)
+      
+      // Look for canonical link
+      const canonicalLink = $('link[rel="canonical"]').attr('href')
+      if (canonicalLink && canonicalLink.includes('tiktok.com')) {
+        return canonicalLink
+      }
+      
+      // Look for og:url meta tag
+      const ogUrl = $('meta[property="og:url"]').attr('content')
+      if (ogUrl && ogUrl.includes('tiktok.com')) {
+        return ogUrl
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error resolving shortened URL:', error)
+    return null
+  }
+}
+
+/**
  * Extract the TikTok video ID from a URL
  */
 function extractTikTokVideoId(url: string): string | null {
   try {
-    // Check for mobile or web URLs
+    // Check for various URL patterns
+    
+    // Standard pattern: /video/{id}
     const videoIdRegex = /\/video\/(\d+)/
     const match = url.match(videoIdRegex)
     
     if (match && match[1]) {
       return match[1]
+    }
+    
+    // Alternative pattern for embedded videos: /embed/v2/(\d+)
+    const embedRegex = /\/embed\/v2\/(\d+)/
+    const embedMatch = url.match(embedRegex)
+    
+    if (embedMatch && embedMatch[1]) {
+      return embedMatch[1]
+    }
+    
+    // Some URLs have the ID in a query parameter
+    const urlObj = new URL(url)
+    const idParam = urlObj.searchParams.get('id')
+    if (idParam) {
+      return idParam
     }
     
     return null
