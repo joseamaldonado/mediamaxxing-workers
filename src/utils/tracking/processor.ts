@@ -3,6 +3,10 @@ import { Database } from '../../types/supabase'
 import { tiktokTracker } from './platforms/tiktok'
 import { youtubeTracker } from './platforms/youtube'
 import { instagramTracker } from './platforms/instagram'
+import * as dotenv from 'dotenv'
+
+// Load environment variables
+dotenv.config({ path: '.env.local' })
 
 // Initialize Supabase client
 function getSupabaseClient() {
