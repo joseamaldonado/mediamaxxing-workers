@@ -77,7 +77,7 @@ async function setupTestData(): Promise<void> {
   const { data: campaigns, error: campaignError } = await supabase
     .from('campaigns')
     .select('id, title')
-    .eq('active', true)
+    .eq('status', 'active')
     .limit(1);
   
   if (campaignError || !campaigns || campaigns.length === 0) {
@@ -111,11 +111,10 @@ async function setupTestData(): Promise<void> {
   const { error: updateCampaignError } = await supabase
     .from('campaigns')
     .update({ 
-      funded: true, 
+      status: 'active',
       budget: TEST_BUDGET,  // $10K budget
       total_paid: 0,
-      rate_per_1000_views: 1.00, // $1.00 per 1000 views
-      active: true
+      rate_per_1000_views: 1.00 // $1.00 per 1000 views
     })
     .eq('id', campaignId);
   
@@ -273,7 +272,7 @@ async function checkStatus() {
     log(`Campaign: ${campaign.title}`, colors.cyan);
     log(`  Budget: $${campaign.budget.toFixed(2)}`, colors.cyan);
     log(`  Total Paid: $${campaign.total_paid.toFixed(2)}`, colors.cyan);
-    log(`  Active: ${campaign.active ? 'Yes' : 'No'}`, campaign.active ? colors.green : colors.red);
+    log(`  Active: ${campaign.status === 'active' ? 'Yes' : 'No'}`, campaign.status === 'active' ? colors.green : colors.red);
   }
   
   // Check all submissions

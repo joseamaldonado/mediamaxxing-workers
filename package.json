@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Cron scripts for Whop view tracking and payment processing",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:state-machine": "NODE_ENV=development ts-node src/tests/campaign-state-machine.test.ts",
     "track-views": "ts-node scripts/track-views.ts",
     "process-payments": "ts-node scripts/process-payments.ts",
     "setup": "./scripts/setup-cron.sh",
