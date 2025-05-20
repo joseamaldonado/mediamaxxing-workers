@@ -147,7 +147,25 @@ async function processPaymentForSubmission(submission: any) {
       if (highestUnpaidView) {
         const newViews = Math.max(0, highestUnpaidView.view_count - baselineViews);
         const ratePerView = Number(campaign.rate_per_1000_views) / 1000;
-        const estimatedPayment = Number((newViews * ratePerView).toFixed(2));
+        let estimatedPayment = Number((newViews * ratePerView).toFixed(2));
+        
+        // Apply max payout per submission limit if set
+        if (campaign.payout_max_per_submission && Number(campaign.payout_max_per_submission) > 0) {
+          const { data: currentSubmission } = await supabase
+            .from('submissions')
+            .select('payout_amount')
+            .eq('id', submissionId)
+            .single();
+          
+          const currentPayoutAmount = Number(currentSubmission?.payout_amount || 0);
+          const maxPayoutPerSubmission = Number(campaign.payout_max_per_submission);
+          const remainingAllowedPayout = Math.max(0, maxPayoutPerSubmission - currentPayoutAmount);
+          
+          estimatedPayment = Math.min(estimatedPayment, remainingAllowedPayout);
+        }
+        
+        // Apply campaign budget limit
+        estimatedPayment = Math.min(estimatedPayment, Number(campaign.budget) - currentTotal);
         
         // Check if this payment would cross the breakpoint
         if (currentTotal + estimatedPayment >= nextBreakpoint) {
@@ -226,7 +244,7 @@ async function processPaymentForSubmission(submission: any) {
   
   // Check if payment would exceed campaign budget
   const remainingBudget = Number(campaign.budget) - Number(campaign.total_paid);
-  const finalPaymentAmount = Math.min(paymentAmount, remainingBudget);
+  let finalPaymentAmount = Math.min(paymentAmount, remainingBudget);
   
   if (finalPaymentAmount <= 0) {
     return { 
@@ -234,6 +252,38 @@ async function processPaymentForSubmission(submission: any) {
       success: false, 
       error: 'Campaign budget exhausted' 
     };
+  }
+  
+  // Check if payment would exceed max payout per submission (if set)
+  if (campaign.payout_max_per_submission && Number(campaign.payout_max_per_submission) > 0) {
+    // Get current payout amount for this submission
+    const { data: currentSubmission } = await supabase
+      .from('submissions')
+      .select('payout_amount')
+      .eq('id', submissionId)
+      .single();
+    
+    const currentPayoutAmount = Number(currentSubmission?.payout_amount || 0);
+    const maxPayoutPerSubmission = Number(campaign.payout_max_per_submission);
+    
+    // Calculate remaining allowed payout for this submission
+    const remainingAllowedPayout = Math.max(0, maxPayoutPerSubmission - currentPayoutAmount);
+    
+    // If we'll exceed the max, adjust the payment amount
+    if (finalPaymentAmount > remainingAllowedPayout) {
+      // If no more payment allowed, return early
+      if (remainingAllowedPayout <= 0) {
+        console.log(`Submission ${submissionId} has reached max payout limit of $${maxPayoutPerSubmission}`);
+        return {
+          submissionId,
+          success: true,
+          message: `Submission has reached max payout limit of $${maxPayoutPerSubmission}`
+        };
+      }
+      
+      console.log(`Adjusting payment from $${finalPaymentAmount} to $${remainingAllowedPayout} due to max payout limit`);
+      finalPaymentAmount = remainingAllowedPayout;
+    }
   }
   
   try {
