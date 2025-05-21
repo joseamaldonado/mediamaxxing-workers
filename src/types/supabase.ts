@@ -42,7 +42,7 @@ export type Database = {
           created_by: string
           current_breakpoint_index: number | null
           description: string
-          end_date: string
+          end_date: string | null
           id: string
           payout_max_per_submission: number
           rate_per_1000_views: number
@@ -62,7 +62,7 @@ export type Database = {
           created_by: string
           current_breakpoint_index?: number | null
           description: string
-          end_date: string
+          end_date: string | null
           id?: string
           payout_max_per_submission?: number
           rate_per_1000_views: number
@@ -82,7 +82,7 @@ export type Database = {
           created_by?: string
           current_breakpoint_index?: number | null
           description?: string
-          end_date?: string
+          end_date?: string | null
           id?: string
           payout_max_per_submission?: number
           rate_per_1000_views?: number

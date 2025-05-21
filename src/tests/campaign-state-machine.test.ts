@@ -77,7 +77,7 @@ async function getTestUser() {
 // Test fixture for creating test campaigns
 async function createTestCampaign(status: CampaignStatus, options: {
   startDateOffset?: number; // days from now
-  endDateOffset?: number; // days from now
+  endDateOffset?: number | null; // days from now, null for indefinite campaigns
   breakpoints?: number[];
   budget?: number;
   title?: string;
@@ -88,7 +88,9 @@ async function createTestCampaign(status: CampaignStatus, options: {
   // Calculate dates
   const now = new Date();
   const startDate = new Date(now.getTime() + (options.startDateOffset || 0) * DAY_MS);
-  const endDate = new Date(now.getTime() + (options.endDateOffset || 30) * DAY_MS);
+  const endDate = options.endDateOffset === null 
+    ? null 
+    : new Date(now.getTime() + (options.endDateOffset || 30) * DAY_MS);
   
   // Get an existing brand
   const { data: existingBrands, error: brandError } = await supabase
@@ -117,7 +119,7 @@ async function createTestCampaign(status: CampaignStatus, options: {
       budget_breakpoints: options.breakpoints || [],
       current_breakpoint_index: 0,
       start_date: startDate.toISOString(),
-      end_date: endDate.toISOString(),
+      end_date: endDate ? endDate.toISOString() : null,
       status: status,
       total_paid: 0,
     })
