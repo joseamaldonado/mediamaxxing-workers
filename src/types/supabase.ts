@@ -44,7 +44,9 @@ export type Database = {
           description: string
           end_date: string | null
           id: string
+          links: string[] | null
           payout_max_per_submission: number
+          payout_min_per_submission: number
           rate_per_1000_views: number
           start_date: string
           status: Database["public"]["Enums"]["campaign_status"]
@@ -62,9 +64,11 @@ export type Database = {
           created_by: string
           current_breakpoint_index?: number | null
           description: string
-          end_date: string | null
+          end_date?: string | null
           id?: string
+          links?: string[] | null
           payout_max_per_submission?: number
+          payout_min_per_submission?: number
           rate_per_1000_views: number
           start_date: string
           status?: Database["public"]["Enums"]["campaign_status"]
@@ -84,7 +88,9 @@ export type Database = {
           description?: string
           end_date?: string | null
           id?: string
+          links?: string[] | null
           payout_max_per_submission?: number
+          payout_min_per_submission?: number
           rate_per_1000_views?: number
           start_date?: string
           status?: Database["public"]["Enums"]["campaign_status"]

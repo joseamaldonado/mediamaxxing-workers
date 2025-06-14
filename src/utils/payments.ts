@@ -242,6 +242,34 @@ async function processPaymentForSubmission(submission: any) {
     };
   }
   
+  // Check if payment meets minimum payout threshold
+  if (campaign.payout_min_per_submission && Number(campaign.payout_min_per_submission) > 0) {
+    const minPayout = Number(campaign.payout_min_per_submission);
+    
+    // Get current payout amount for this submission
+    const { data: currentSubmission } = await supabase
+      .from('submissions')
+      .select('payout_amount')
+      .eq('id', submissionId)
+      .single();
+    
+    const currentPayoutAmount = Number(currentSubmission?.payout_amount || 0);
+    const totalEarnings = currentPayoutAmount + paymentAmount;
+    
+    // If this submission hasn't reached the minimum threshold yet, skip payment
+    if (totalEarnings < minPayout) {
+      console.log(`Submission ${submissionId} earnings ($${totalEarnings.toFixed(2)}) below minimum threshold ($${minPayout.toFixed(2)})`);
+      return {
+        submissionId,
+        success: true,
+        message: `Earnings ($${totalEarnings.toFixed(2)}) below minimum payout threshold ($${minPayout.toFixed(2)}). Payment deferred.`,
+        deferredAmount: paymentAmount,
+        totalEarnings: totalEarnings,
+        minThreshold: minPayout
+      };
+    }
+  }
+  
   // Check if payment would exceed campaign budget
   const remainingBudget = Number(campaign.budget) - Number(campaign.total_paid);
   let finalPaymentAmount = Math.min(paymentAmount, remainingBudget);
