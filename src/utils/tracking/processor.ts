@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '../../types/supabase'
-import { tiktokTracker } from './platforms/tiktok'
-import { youtubeTracker } from './platforms/youtube'
-import { instagramTracker } from './platforms/instagram'
+import { tiktokTracker, TikTokEngagement } from './platforms/tiktok'
+import { youtubeTracker, YouTubeEngagement } from './platforms/youtube'
+import { instagramTracker, InstagramEngagement } from './platforms/instagram'
 import * as dotenv from 'dotenv'
 
 // Load environment variables
@@ -21,7 +21,10 @@ function getSupabaseClient() {
 }
 
 type PlatformType = Database['public']['Enums']['platform_type']
-type TrackerFunction = (url: string) => Promise<number | null>
+type EngagementData = TikTokEngagement | YouTubeEngagement | InstagramEngagement
+
+// Updated tracker function type to return engagement data
+type TrackerFunction = (url: string) => Promise<EngagementData>
 
 // Platform-specific trackers map
 const trackers: Record<PlatformType, TrackerFunction> = {
@@ -31,11 +34,11 @@ const trackers: Record<PlatformType, TrackerFunction> = {
 }
 
 /**
- * Main function to track views for all active submissions
+ * Main function to track engagement for all active submissions
  * @returns A summary of the tracking process
  */
-export async function trackAllViews() {
-  console.log('Starting view tracking process...')
+export async function trackAllEngagement() {
+  console.log('Starting engagement tracking process...')
   const supabase = getSupabaseClient()
   const results = { tracked: 0, skipped: 0, error: 0 }
   
@@ -43,7 +46,7 @@ export async function trackAllViews() {
     // Fetch all approved submissions that should be tracked
     const { data: submissions, error } = await supabase
       .from('submissions')
-      .select('id, asset_url, platform, views, campaign_id')
+      .select('id, asset_url, platform, views, likes, comments, campaign_id')
       .eq('status', 'approved')
       .not('platform', 'is', null) // Skip submissions without a platform
     
@@ -61,7 +64,7 @@ export async function trackAllViews() {
       try {
         const result = await processSubmission(submission)
         if (result.success) {
-          if (result.viewDifference && result.viewDifference > 0) {
+          if (result.hasNewData) {
             results.tracked++
           } else {
             results.skipped++
@@ -75,14 +78,14 @@ export async function trackAllViews() {
       }
     }
     
-    console.log('View tracking completed successfully')
+    console.log('Engagement tracking completed successfully')
     return {
       ...results,
-      message: 'View tracking completed successfully',
+      message: 'Engagement tracking completed successfully',
       timestamp: new Date().toISOString()
     }
   } catch (error) {
-    console.error('Error tracking views:', error)
+    console.error('Error tracking engagement:', error)
     return {
       ...results,
       error: true,
@@ -117,67 +120,104 @@ export async function processSubmission(submission: any) {
     // Get the appropriate tracker
     const tracker = trackers[platform]
     
-    // Track views for this submission
-    const currentViews = await tracker(submission.asset_url)
+    // Track engagement for this submission
+    const currentEngagement = await tracker(submission.asset_url)
     
-    if (currentViews === null) {
-      console.log(`Unable to track views for submission ${submission.id}`)
+    if (!currentEngagement || (currentEngagement.views === null && currentEngagement.likes === null && currentEngagement.comments === null)) {
+      console.log(`Unable to track engagement for submission ${submission.id}`)
       return { 
         success: false,
-        message: 'Unable to track views' 
+        message: 'Unable to track engagement' 
       }
     }
     
-    // Calculate difference from last known view count
-    const viewDifference = Math.max(0, currentViews - submission.views)
+    // Calculate differences from last known counts
+    const viewDifference = currentEngagement.views !== null ? Math.max(0, currentEngagement.views - (submission.views || 0)) : 0
+    const likesDifference = currentEngagement.likes !== null ? Math.max(0, currentEngagement.likes - (submission.likes || 0)) : 0
+    const commentsDifference = currentEngagement.comments !== null ? Math.max(0, currentEngagement.comments - (submission.comments || 0)) : 0
     
-    // Skip if no new views
-    if (viewDifference === 0) {
-      console.log(`No new views for submission ${submission.id}`)
-      return { 
-        success: true, 
-        viewDifference: 0, 
-        currentViews,
-        message: 'No new views' 
+    let hasNewData = false
+    let successfulUpdates: string[] = []
+    
+    // Track views if available and there are new views
+    if (currentEngagement.views !== null && viewDifference > 0) {
+      try {
+        const { error } = await supabase.rpc('track_new_views', {
+          p_submission_id: submission.id,
+          p_current_views: currentEngagement.views,
+          p_view_difference: viewDifference
+        });
+        
+        if (error) {
+          console.error('Error tracking views:', error);
+        } else {
+          console.log(`Successfully tracked ${viewDifference} new views for submission ${submission.id}`);
+          successfulUpdates.push(`${viewDifference} views`)
+          hasNewData = true
+        }
+      } catch (error) {
+        console.error('Error tracking views:', error);
       }
     }
     
-    console.log(`Submission ${submission.id} has ${viewDifference} new views (total: ${currentViews})`)
+    // Track likes if available and there are new likes
+    if (currentEngagement.likes !== null && likesDifference > 0) {
+      try {
+        const { error } = await supabase.rpc('track_new_likes', {
+          p_submission_id: submission.id,
+          p_current_likes: currentEngagement.likes,
+          p_likes_difference: likesDifference
+        });
+        
+        if (error) {
+          console.error('Error tracking likes:', error);
+        } else {
+          console.log(`Successfully tracked ${likesDifference} new likes for submission ${submission.id}`);
+          successfulUpdates.push(`${likesDifference} likes`)
+          hasNewData = true
+        }
+      } catch (error) {
+        console.error('Error tracking likes:', error);
+      }
+    }
     
-    // FIXED: Use a cleaner approach to call the stored procedure
-    // 1. Use a separate try/catch for the database operation
-    try {
-      // Call the stored procedure
-      const { data, error } = await supabase.rpc('track_new_views', {
+    // Track comments if available and there are new comments
+    if (currentEngagement.comments !== null && commentsDifference > 0) {
+      try {
+        const { error } = await supabase.rpc('track_new_comments', {
         p_submission_id: submission.id,
-        p_current_views: currentViews,
-        p_view_difference: viewDifference
+          p_current_comments: currentEngagement.comments,
+          p_comments_difference: commentsDifference
       });
       
-      // Handle any errors from the stored procedure
       if (error) {
-        console.error('Stored procedure error:', error);
-        return { 
-          success: false, 
-          message: `Database error: ${error.message}`
-        };
+          console.error('Error tracking comments:', error);
+        } else {
+          console.log(`Successfully tracked ${commentsDifference} new comments for submission ${submission.id}`);
+          successfulUpdates.push(`${commentsDifference} comments`)
+          hasNewData = true
+        }
+      } catch (error) {
+        console.error('Error tracking comments:', error);
       }
-      
-      console.log(`Successfully tracked ${viewDifference} new views for submission ${submission.id}`);
-      
+    }
+    
+    if (hasNewData) {
+      console.log(`Submission ${submission.id} successfully updated: ${successfulUpdates.join(', ')}`)
       return { 
         success: true, 
-        viewDifference, 
-        currentViews,
-        message: `Successfully tracked ${viewDifference} new views` 
-      };
-    } catch (dbError) {
-      // Handle any unexpected errors during the database operation
-      console.error('Unexpected database error:', dbError);
+        hasNewData: true,
+        currentEngagement,
+        message: `Successfully tracked: ${successfulUpdates.join(', ')}` 
+      }
+    } else {
+      console.log(`No new engagement data for submission ${submission.id}`)
       return { 
-        success: false, 
-        message: dbError instanceof Error ? dbError.message : 'Database operation failed'
-      };
+        success: true, 
+        hasNewData: false,
+        currentEngagement,
+        message: 'No new engagement data' 
+      }
     }
   } catch (error) {
     console.error(`Error processing submission ${submission.id}:`, error)
@@ -186,4 +226,10 @@ export async function processSubmission(submission: any) {
       message: error instanceof Error ? error.message : 'Unknown error'
     }
   }
+}
+
+// Keep backward compatibility - this function now calls the new engagement tracker
+export async function trackAllViews() {
+  console.log('Note: trackAllViews() is deprecated. Use trackAllEngagement() instead.')
+  return trackAllEngagement()
 } 

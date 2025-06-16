@@ -145,38 +145,251 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      comments_history: {
+        Row: {
+          comments_count: number
+          created_at: string | null
+          id: string
+          submission_id: string
+          tracked_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          comments_count: number
+          created_at?: string | null
+          id?: string
+          submission_id: string
+          tracked_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          comments_count?: number
+          created_at?: string | null
+          id?: string
+          submission_id?: string
+          tracked_at?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      likes_history: {
         Row: {
           created_at: string | null
+          id: string
+          likes_count: number
+          submission_id: string
+          tracked_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          likes_count: number
+          submission_id: string
+          tracked_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          likes_count?: number
+          submission_id?: string
+          tracked_at?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "likes_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mentions: {
+        Row: {
+          created_at: string | null
+          id: string
+          mentioned_by: string
+          message_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mentioned_by: string
+          message_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mentioned_by?: string
+          message_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentions_mentioned_by_fkey"
+            columns: ["mentioned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          content: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          is_read: boolean
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paypals: {
+        Row: {
+          address: string | null
+          country: string
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_primary: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          country: string
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_primary?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          country?: string
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_primary?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paypals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          country_code: string | null
+          created_at: string | null
+          discord_username: string | null
           email: string | null
           first_name: string | null
           id: string
           is_admin: boolean | null
           last_name: string | null
+          marketing_consent: boolean | null
+          pfp_url: string | null
           stripe_connect_id: string | null
           stripe_connect_onboarded: boolean | null
           updated_at: string | null
           username: string | null
         }
         Insert: {
+          country_code?: string | null
           created_at?: string | null
+          discord_username?: string | null
           email?: string | null
           first_name?: string | null
           id: string
           is_admin?: boolean | null
           last_name?: string | null
+          marketing_consent?: boolean | null
+          pfp_url?: string | null
           stripe_connect_id?: string | null
           stripe_connect_onboarded?: boolean | null
           updated_at?: string | null
           username?: string | null
         }
         Update: {
+          country_code?: string | null
           created_at?: string | null
+          discord_username?: string | null
           email?: string | null
           first_name?: string | null
           id?: string
           is_admin?: boolean | null
           last_name?: string | null
+          marketing_consent?: boolean | null
+          pfp_url?: string | null
           stripe_connect_id?: string | null
           stripe_connect_onboarded?: boolean | null
           updated_at?: string | null
@@ -188,8 +401,10 @@ export type Database = {
         Row: {
           asset_url: string
           campaign_id: string
+          comments: number | null
           created_at: string | null
           id: string
+          likes: number | null
           payout_amount: number | null
           platform: Database["public"]["Enums"]["platform_type"] | null
           status: Database["public"]["Enums"]["submission_status"] | null
@@ -200,8 +415,10 @@ export type Database = {
         Insert: {
           asset_url: string
           campaign_id: string
+          comments?: number | null
           created_at?: string | null
           id?: string
+          likes?: number | null
           payout_amount?: number | null
           platform?: Database["public"]["Enums"]["platform_type"] | null
           status?: Database["public"]["Enums"]["submission_status"] | null
@@ -212,8 +429,10 @@ export type Database = {
         Update: {
           asset_url?: string
           campaign_id?: string
+          comments?: number | null
           created_at?: string | null
           id?: string
+          likes?: number | null
           payout_amount?: number | null
           platform?: Database["public"]["Enums"]["platform_type"] | null
           status?: Database["public"]["Enums"]["submission_status"] | null
@@ -227,6 +446,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -282,8 +508,17 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      create_mention_notification: {
+        Args: {
+          p_recipient_id: string
+          p_sender_id: string
+          p_message: string
+          p_chat_id: string
+        }
+        Returns: string
+      }
       get_submissions_with_profiles: {
-        Args: { campaign_id_param: string; status_param: string }
+        Args: { campaign_id_param: string; status_param?: string }
         Returns: {
           id: string
           campaign_id: string
@@ -295,15 +530,31 @@ export type Database = {
           created_at: string
           updated_at: string
           email: string
+          discord_username: string
+          country_code: string
         }[]
       }
       process_payout: {
-        Args: {
-          submission_id: string
-          view_count: number
-          payout_amount: number
-        }
+        Args:
+          | { p_view_history_id: string }
+          | { submission_id: string; view_count: number; payout_amount: number }
         Returns: boolean
+      }
+      track_new_comments: {
+        Args: {
+          p_submission_id: string
+          p_current_comments: number
+          p_comments_difference: number
+        }
+        Returns: undefined
+      }
+      track_new_likes: {
+        Args: {
+          p_submission_id: string
+          p_current_likes: number
+          p_likes_difference: number
+        }
+        Returns: undefined
       }
       track_new_views: {
         Args: {

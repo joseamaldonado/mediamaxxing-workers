@@ -1,27 +1,36 @@
 import { ApifyClient } from 'apify-client'
 
 /**
- * Instagram view tracker - extracts view counts from Instagram videos using Apify API
+ * Instagram engagement data structure
+ */
+export interface InstagramEngagement {
+  views: number | null
+  likes: number | null
+  comments: number | null
+}
+
+/**
+ * Instagram engagement tracker - extracts views, likes, and comments from Instagram videos using Apify API
  * 
  * @param url The Instagram video URL
- * @returns The current view count or null if tracking failed
+ * @returns Object containing views, likes, and comments or null values if tracking failed
  */
-export async function instagramTracker(url: string): Promise<number | null> {
+export async function instagramTracker(url: string): Promise<InstagramEngagement> {
   try {
-    console.log(`Tracking Instagram views for: ${url}`)
+    console.log(`Tracking Instagram engagement for: ${url}`)
     
     // Extract shortcode from URL for validation
     const shortcode = extractInstagramShortcode(url)
     if (!shortcode) {
       console.error('Could not extract Instagram shortcode from URL:', url)
-      return null
+      return { views: null, likes: null, comments: null }
     }
     
     // API token should be stored in environment variables
     const apiToken = process.env.APIFY_API_TOKEN
     if (!apiToken) {
       console.error('Apify API token is missing. Set APIFY_API_TOKEN in .env.local')
-      return null
+      return { views: null, likes: null, comments: null }
     }
     
     // Initialize the ApifyClient with your Apify API token
@@ -45,34 +54,52 @@ export async function instagramTracker(url: string): Promise<number | null> {
     // Run the Actor and wait for it to finish
     const run = await client.actor("apify/instagram-scraper").call(input)
     
-    // Fetch and extract the playcount
+    // Fetch and extract the engagement data
     const { items } = await client.dataset(run.defaultDatasetId).listItems()
     
-    if (items && items.length > 0 && items[0].videoPlayCount) {
-      // Ensure we convert the playCount to a number
-      const playCountValue = items[0].videoPlayCount
-      const playCount = typeof playCountValue === 'number' 
-        ? playCountValue 
-        : parseInt(String(playCountValue), 10)
+    if (items && items.length > 0) {
+      const post = items[0]
       
-      if (isNaN(playCount)) {
-        console.error('Invalid play count format:', playCountValue)
-        return null
+      // Extract engagement metrics
+      const views = post.videoPlayCount ? 
+        (typeof post.videoPlayCount === 'number' ? post.videoPlayCount : parseInt(String(post.videoPlayCount), 10)) : 
+        null
+      
+      const likes = post.likesCount ? 
+        (typeof post.likesCount === 'number' ? post.likesCount : parseInt(String(post.likesCount), 10)) : 
+        null
+      
+      const comments = post.commentsCount ? 
+        (typeof post.commentsCount === 'number' ? post.commentsCount : parseInt(String(post.commentsCount), 10)) : 
+        null
+      
+      // Validate parsed numbers
+      const validViews = views && !isNaN(views) ? views : null
+      const validLikes = likes && !isNaN(likes) ? likes : null
+      const validComments = comments && !isNaN(comments) ? comments : null
+      
+      console.log(`Instagram post ${shortcode} engagement:`, {
+        views: validViews,
+        likes: validLikes,
+        comments: validComments
+      })
+      
+      return {
+        views: validViews,
+        likes: validLikes,
+        comments: validComments
       }
-      
-      console.log(`Instagram post ${shortcode} has ${playCount} views (from Apify)`)
-      return playCount
     } else {
-      console.error('Could not extract view count from Instagram using Apify')
+      console.error('Could not extract engagement data from Instagram using Apify')
       if (items && items.length > 0) {
         console.error('Response data:', items[0])
       }
-      return null
+      return { views: null, likes: null, comments: null }
     }
     
   } catch (error) {
-    console.error('Error tracking Instagram views:', error)
-    return null
+    console.error('Error tracking Instagram engagement:', error)
+    return { views: null, likes: null, comments: null }
   }
 }
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Cron script for tracking views
+ * Cron script for tracking engagement (views, likes, comments)
  * Run hourly via crontab
  */
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { trackAllViews } from '../src/utils/tracking/processor';
+import { trackAllEngagement } from '../src/utils/tracking/processor';
 
 async function main() {
   const startTime = new Date();
-  console.log(`[${startTime.toISOString()}] Starting view tracking job`);
+  console.log(`[${startTime.toISOString()}] Starting engagement tracking job`);
   
   try {
     // Create logs directory if it doesn't exist
@@ -19,14 +19,14 @@ async function main() {
       fs.mkdirSync(logsDir, { recursive: true });
     }
     
-    // Run the view tracking process
-    const result = await trackAllViews();
+    // Run the engagement tracking process (views, likes, comments)
+    const result = await trackAllEngagement();
     
     // Log the results
     const endTime = new Date();
     const duration = (endTime.getTime() - startTime.getTime()) / 1000;
     
-    console.log(`[${endTime.toISOString()}] View tracking completed in ${duration}s`);
+    console.log(`[${endTime.toISOString()}] Engagement tracking completed in ${duration}s`);
     console.log(`Results: Tracked: ${result.tracked}, Skipped: ${result.skipped}, Errors: ${result.error}`);
     
     // Also write to a log file
@@ -36,7 +36,7 @@ async function main() {
       ...result
     };
     
-    const logFile = path.resolve(logsDir, `view-tracking-${startTime.toISOString().split('T')[0]}.log`);
+    const logFile = path.resolve(logsDir, `engagement-tracking-${startTime.toISOString().split('T')[0]}.log`);
     fs.appendFileSync(
       logFile, 
       JSON.stringify(logEntry) + '\n'
@@ -44,7 +44,7 @@ async function main() {
     
     process.exit(0);
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] View tracking failed:`, error);
+    console.error(`[${new Date().toISOString()}] Engagement tracking failed:`, error);
     process.exit(1);
   }
 }

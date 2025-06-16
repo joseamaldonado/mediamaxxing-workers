@@ -2,14 +2,23 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 
 /**
- * TikTok view tracker - extracts view counts from TikTok videos
+ * TikTok engagement data structure
+ */
+export interface TikTokEngagement {
+  views: number | null
+  likes: number | null
+  comments: number | null
+}
+
+/**
+ * TikTok engagement tracker - extracts views, likes, and comments from TikTok videos
  * 
  * @param url The TikTok video URL
- * @returns The current view count or null if tracking failed
+ * @returns Object containing views, likes, and comments or null values if tracking failed
  */
-export async function tiktokTracker(url: string): Promise<number | null> {
+export async function tiktokTracker(url: string): Promise<TikTokEngagement> {
   try {
-    console.log(`Tracking TikTok views for: ${url}`)
+    console.log(`Tracking TikTok engagement for: ${url}`)
     
     // Check if this is a shortened URL
     if (url.includes('/t/')) {
@@ -20,7 +29,7 @@ export async function tiktokTracker(url: string): Promise<number | null> {
         url = resolvedUrl
       } else {
         console.error('Failed to resolve shortened TikTok URL')
-        return null
+        return { views: null, likes: null, comments: null }
       }
     }
     
@@ -28,7 +37,7 @@ export async function tiktokTracker(url: string): Promise<number | null> {
     const videoId = extractTikTokVideoId(url)
     if (!videoId) {
       console.error('Could not extract TikTok video ID from URL:', url)
-      return null
+      return { views: null, likes: null, comments: null }
     }
     
     console.log(`Extracted video ID: ${videoId}`)
@@ -44,41 +53,53 @@ export async function tiktokTracker(url: string): Promise<number | null> {
     
     if (response.status !== 200) {
       console.error(`Failed to fetch TikTok page: HTTP ${response.status}`)
-      return null
+      return { views: null, likes: null, comments: null }
     }
     
     // Use Cheerio to parse the HTML
     const $ = cheerio.load(response.data)
     
-    // Method 2: Look for view count in embedded JSON data (this worked in Python)
-    // Prioritize this method as it was successful in the Python implementation
-    console.log('Trying to extract view count from embedded JSON data')
+    let views: number | null = null
+    let likes: number | null = null
+    let comments: number | null = null
+    
+    // Method 1: Look for engagement data in embedded JSON data (prioritize this method)
+    console.log('Trying to extract engagement data from embedded JSON')
     const scriptTags = $('script')
     
     for (let i = 0; i < scriptTags.length; i++) {
       const scriptContent = $(scriptTags[i]).html()
-      if (scriptContent && scriptContent.includes('"playCount":')) {
-        const playCountMatch = scriptContent.match(/"playCount":(\d+)/)
-        if (playCountMatch) {
-          const viewCount = parseInt(playCountMatch[1], 10)
-          console.log(`TikTok video ${videoId} has ${viewCount} views (from JSON data)`)
-          return viewCount
+      if (scriptContent && scriptContent.includes('"stats":')) {
+        // Try to extract all engagement metrics from JSON
+        const viewCountMatch = scriptContent.match(/"playCount":(\d+)/)
+        const likeCountMatch = scriptContent.match(/"diggCount":(\d+)/)
+        const commentCountMatch = scriptContent.match(/"commentCount":(\d+)/)
+        
+        if (viewCountMatch) {
+          views = parseInt(viewCountMatch[1], 10)
+          console.log(`Found views in JSON: ${views}`)
+        }
+        
+        if (likeCountMatch) {
+          likes = parseInt(likeCountMatch[1], 10)
+          console.log(`Found likes in JSON: ${likes}`)
+        }
+        
+        if (commentCountMatch) {
+          comments = parseInt(commentCountMatch[1], 10)
+          console.log(`Found comments in JSON: ${comments}`)
+        }
+        
+        // If we found some data, break out of the loop
+        if (views !== null || likes !== null || comments !== null) {
+          break
         }
       }
     }
     
-    // Method 1: Look for the view count element using the data-e2e attribute
-    console.log('Trying to extract view count from CSS selector')
-    const viewCountElement = $('[data-e2e="video-stat-count"]').first()
-    if (viewCountElement.length) {
-      const viewCountText = viewCountElement.text().trim()
-      const viewCount = parseViewCount(viewCountText)
-      console.log(`TikTok video ${videoId} has ${viewCount} views (from element)`)
-      return viewCount
-    }
-    
-    // Method 3: Look for SIGI_STATE JSON data (newer TikTok format)
-    console.log('Trying to extract view count from SIGI_STATE')
+    // Method 2: Try SIGI_STATE JSON data (newer TikTok format)
+    if ((views === null && likes === null && comments === null)) {
+      console.log('Trying to extract engagement data from SIGI_STATE')
     for (let i = 0; i < scriptTags.length; i++) {
       const scriptContent = $(scriptTags[i]).html()
       if (scriptContent && scriptContent.includes('SIGI_STATE')) {
@@ -86,28 +107,76 @@ export async function tiktokTracker(url: string): Promise<number | null> {
         if (jsonDataMatch) {
           try {
             const jsonData = JSON.parse(jsonDataMatch[1])
-            // Navigate through the JSON to find the play count
+              // Navigate through the JSON to find the engagement data
             if (jsonData.ItemModule && jsonData.ItemModule[videoId]) {
               const item = jsonData.ItemModule[videoId]
-              if (item.stats && item.stats.playCount) {
-                const viewCount = parseInt(item.stats.playCount, 10)
-                console.log(`TikTok video ${videoId} has ${viewCount} views (from SIGI_STATE)`)
-                return viewCount
+                if (item.stats) {
+                  views = item.stats.playCount ? parseInt(item.stats.playCount, 10) : null
+                  likes = item.stats.diggCount ? parseInt(item.stats.diggCount, 10) : null
+                  comments = item.stats.commentCount ? parseInt(item.stats.commentCount, 10) : null
+                  
+                  console.log(`Found engagement data in SIGI_STATE:`, { views, likes, comments })
+                  break
               }
             }
           } catch (e) {
-            console.error(`Error parsing JSON data: ${e}`)
+              console.error(`Error parsing SIGI_STATE JSON data: ${e}`)
           }
         }
       }
     }
+    }
     
-    console.error('Could not find view count on TikTok page')
-    return null
+    // Method 3: Look for engagement data in CSS selectors (fallback)
+    if (views === null && likes === null && comments === null) {
+      console.log('Trying to extract engagement data from CSS selectors')
+      
+      // Try to find view count
+      const viewElements = $('[data-e2e="video-stat-count"]')
+      if (viewElements.length > 0) {
+        const viewCountText = $(viewElements[0]).text().trim()
+        views = parseEngagementCount(viewCountText)
+        console.log(`Found views in CSS: ${views}`)
+      }
+      
+      // Try to find like and comment counts from other selectors
+      $('[data-e2e]').each((_, element) => {
+        const $element = $(element)
+        const dataE2e = $element.attr('data-e2e')
+        const text = $element.text().trim()
+        
+        if (dataE2e?.includes('like') && likes === null) {
+          likes = parseEngagementCount(text)
+          console.log(`Found likes in CSS: ${likes}`)
+        }
+        
+        if (dataE2e?.includes('comment') && comments === null) {
+          comments = parseEngagementCount(text)
+          console.log(`Found comments in CSS: ${comments}`)
+        }
+      })
+    }
+    
+    // Validate results
+    if (views && isNaN(views)) views = null
+    if (likes && isNaN(likes)) likes = null
+    if (comments && isNaN(comments)) comments = null
+    
+    console.log(`TikTok video ${videoId} engagement:`, {
+      views,
+      likes,
+      comments
+    })
+    
+    return {
+      views,
+      likes,
+      comments
+    }
     
   } catch (error) {
-    console.error('Error tracking TikTok views:', error)
-    return null
+    console.error('Error tracking TikTok engagement:', error)
+    return { views: null, likes: null, comments: null }
   }
 }
 
@@ -197,12 +266,14 @@ function extractTikTokVideoId(url: string): string | null {
 }
 
 /**
- * Parse a view count string (e.g., "1.2M", "450.3K") into a number
+ * Parse an engagement count string (e.g., "1.2M", "450.3K") into a number
  */
-function parseViewCount(viewCountText: string): number {
+function parseEngagementCount(countText: string): number | null {
   try {
     // Remove any non-numeric characters except for decimal points, K, M, B
-    const cleaned = viewCountText.replace(/[^0-9\.KMB]/gi, '')
+    const cleaned = countText.replace(/[^0-9\.KMB]/gi, '')
+    
+    if (!cleaned) return null
     
     // Check if we have K, M, or B suffix
     let multiplier = 1
@@ -225,7 +296,7 @@ function parseViewCount(viewCountText: string): number {
     // Return the rounded integer value
     return Math.round(value)
   } catch (error) {
-    console.error('Error parsing view count:', error)
-    return 0
+    console.error('Error parsing engagement count:', error)
+    return null
   }
 } 
