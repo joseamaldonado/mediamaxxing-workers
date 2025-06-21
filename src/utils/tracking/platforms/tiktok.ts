@@ -11,14 +11,38 @@ export interface TikTokEngagement {
 }
 
 /**
+ * Chinese TikTok API response structure (tikwm.com)
+ */
+interface TikWMResponse {
+  code: number
+  msg: string
+  processed_time: number
+  data: {
+    id: string
+    title: string
+    play_count: number
+    digg_count: number
+    comment_count: number
+    share_count: number
+    collect_count: number
+    author: {
+      id: string
+      unique_id: string
+      nickname: string
+    }
+  }
+}
+
+/**
  * TikTok engagement tracker - extracts views, likes, and comments from TikTok videos
+ * Uses Chinese tikwm.com API as primary method with fallback to scraping
  * 
  * @param url The TikTok video URL
  * @returns Object containing views, likes, and comments or null values if tracking failed
  */
 export async function tiktokTracker(url: string): Promise<TikTokEngagement> {
   try {
-    console.log(`Tracking TikTok engagement for: ${url}`)
+    console.log(`🎯 Tracking TikTok engagement for: ${url}`)
     
     // Check if this is a shortened URL
     if (url.includes('/t/')) {
@@ -32,6 +56,69 @@ export async function tiktokTracker(url: string): Promise<TikTokEngagement> {
         return { views: null, likes: null, comments: null }
       }
     }
+
+    // Method 1: Try Chinese tikwm.com API (PRIMARY METHOD)
+    console.log('🇨🇳 Trying Chinese tikwm.com API method...')
+    const chineseResult = await tryChineseTikWMApi(url)
+    if (chineseResult.views !== null || chineseResult.likes !== null || chineseResult.comments !== null) {
+      console.log('✅ SUCCESS with Chinese tikwm.com API!')
+      return chineseResult
+    }
+
+    // Method 2: Fallback to original scraping method
+    console.log('🔄 Falling back to original scraping method...')
+    return await originalTiktokTracker(url)
+
+  } catch (error) {
+    console.error('❌ Error in TikTok tracker:', error)
+    return { views: null, likes: null, comments: null }
+  }
+}
+
+/**
+ * Chinese tikwm.com API method (REVERSE ENGINEERED FROM CHINESE DEVELOPERS)
+ */
+async function tryChineseTikWMApi(url: string): Promise<TikTokEngagement> {
+  try {
+    const tikwmApiUrl = 'https://tikwm.com/api/'
+    
+    const response = await axios.get(tikwmApiUrl, {
+      params: { url },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+        'Accept': 'application/json',
+        'Referer': 'https://tikwm.com/',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      timeout: 15000
+    })
+
+    const data: TikWMResponse = response.data
+
+    if (data.code === 0 && data.msg === 'success' && data.data) {
+      console.log(`🔥 Chinese API success! Processing time: ${data.processed_time}s`)
+      
+      return {
+        views: data.data.play_count || null,
+        likes: data.data.digg_count || null,
+        comments: data.data.comment_count || null
+      }
+    } else {
+      console.log(`❌ Chinese API failed: ${data.msg}`)
+      return { views: null, likes: null, comments: null }
+    }
+
+  } catch (error) {
+    console.error('❌ Chinese tikwm.com API error:', error)
+    return { views: null, likes: null, comments: null }
+  }
+}
+
+/**
+ * Original TikTok tracking method (FALLBACK)
+ */
+async function originalTiktokTracker(url: string): Promise<TikTokEngagement> {
+  try {
     
     // Extract video ID from URL
     const videoId = extractTikTokVideoId(url)
