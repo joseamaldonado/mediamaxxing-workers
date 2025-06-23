@@ -143,6 +143,13 @@ export type Database = {
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "campaign_chat_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_with_calculated_totals"
+            referencedColumns: ["id"]
+          },
         ]
       }
       comments_history: {
@@ -178,6 +185,20 @@ export type Database = {
             referencedRelation: "submissions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "comments_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings_admin"
+            referencedColumns: ["id"]
+          },
         ]
       }
       likes_history: {
@@ -211,6 +232,20 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: false
             referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "likes_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "likes_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings_admin"
             referencedColumns: ["id"]
           },
         ]
@@ -295,6 +330,100 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          baseline_views: number
+          campaign_id: string
+          created_at: string | null
+          description: string | null
+          highest_unpaid_view: number
+          id: string
+          rate_per_view: number
+          stripe_connect_id: string
+          stripe_transfer_id: string
+          submission_id: string
+          updated_at: string | null
+          user_id: string
+          views_paid: number
+        }
+        Insert: {
+          amount: number
+          baseline_views?: number
+          campaign_id: string
+          created_at?: string | null
+          description?: string | null
+          highest_unpaid_view: number
+          id?: string
+          rate_per_view: number
+          stripe_connect_id: string
+          stripe_transfer_id: string
+          submission_id: string
+          updated_at?: string | null
+          user_id: string
+          views_paid: number
+        }
+        Update: {
+          amount?: number
+          baseline_views?: number
+          campaign_id?: string
+          created_at?: string | null
+          description?: string | null
+          highest_unpaid_view?: number
+          id?: string
+          rate_per_view?: number
+          stripe_connect_id?: string
+          stripe_transfer_id?: string
+          submission_id?: string
+          updated_at?: string | null
+          user_id?: string
+          views_paid?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_with_calculated_totals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -411,6 +540,7 @@ export type Database = {
           updated_at: string | null
           user_id: string
           views: number | null
+          was_approved: boolean
         }
         Insert: {
           asset_url: string
@@ -425,6 +555,7 @@ export type Database = {
           updated_at?: string | null
           user_id: string
           views?: number | null
+          was_approved?: boolean
         }
         Update: {
           asset_url?: string
@@ -439,6 +570,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           views?: number | null
+          was_approved?: boolean
         }
         Relationships: [
           {
@@ -446,6 +578,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_with_calculated_totals"
             referencedColumns: ["id"]
           },
           {
@@ -493,13 +632,268 @@ export type Database = {
             referencedRelation: "submissions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "view_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "view_history_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions_with_earnings_admin"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      campaign_payment_summary: {
+        Row: {
+          campaign_id: string | null
+          campaign_title: string | null
+          first_payment: string | null
+          last_payment: string | null
+          total_paid: number | null
+          total_payments: number | null
+          total_views_paid: number | null
+          unique_creators_paid: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_with_calculated_totals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns_with_calculated_totals: {
+        Row: {
+          brand_id: string | null
+          budget: number | null
+          budget_breakpoints: number[] | null
+          calculated_total_paid: number | null
+          created_at: string | null
+          created_by: string | null
+          current_breakpoint_index: number | null
+          description: string | null
+          end_date: string | null
+          id: string | null
+          links: string[] | null
+          payout_max_per_submission: number | null
+          payout_min_per_submission: number | null
+          rate_per_1000_views: number | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"] | null
+          title: string | null
+          total_paid: number | null
+          tutorial_url: string | null
+          tutorial_video_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          budget?: number | null
+          budget_breakpoints?: number[] | null
+          calculated_total_paid?: never
+          created_at?: string | null
+          created_by?: string | null
+          current_breakpoint_index?: number | null
+          description?: string | null
+          end_date?: string | null
+          id?: string | null
+          links?: string[] | null
+          payout_max_per_submission?: number | null
+          payout_min_per_submission?: number | null
+          rate_per_1000_views?: number | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"] | null
+          title?: string | null
+          total_paid?: number | null
+          tutorial_url?: string | null
+          tutorial_video_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          budget?: number | null
+          budget_breakpoints?: number[] | null
+          calculated_total_paid?: never
+          created_at?: string | null
+          created_by?: string | null
+          current_breakpoint_index?: number | null
+          description?: string | null
+          end_date?: string | null
+          id?: string | null
+          links?: string[] | null
+          payout_max_per_submission?: number | null
+          payout_min_per_submission?: number | null
+          rate_per_1000_views?: number | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"] | null
+          title?: string | null
+          total_paid?: number | null
+          tutorial_url?: string | null
+          tutorial_video_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_payment_stats: {
+        Row: {
+          avg_payment_amount: number | null
+          payment_date: string | null
+          payments_count: number | null
+          total_amount: number | null
+          total_views_paid: number | null
+          unique_campaigns: number | null
+          unique_creators: number | null
+        }
+        Relationships: []
+      }
+      payment_summary: {
+        Row: {
+          discord_username: string | null
+          email: string | null
+          first_payment: string | null
+          last_payment: string | null
+          total_earned: number | null
+          total_payments: number | null
+          total_views_paid: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions_with_earnings: {
+        Row: {
+          asset_url: string | null
+          calculated_earnings: number | null
+          campaign_id: string | null
+          comments: number | null
+          created_at: string | null
+          display_status:
+            | Database["public"]["Enums"]["submission_status"]
+            | null
+          id: string | null
+          likes: number | null
+          payout_amount: number | null
+          payout_max_per_submission: number | null
+          payout_min_per_submission: number | null
+          platform: Database["public"]["Enums"]["platform_type"] | null
+          rate_per_1000_views: number | null
+          status: Database["public"]["Enums"]["submission_status"] | null
+          updated_at: string | null
+          user_id: string | null
+          views: number | null
+          was_approved: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_with_calculated_totals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions_with_earnings_admin: {
+        Row: {
+          asset_url: string | null
+          calculated_earnings: number | null
+          campaign_id: string | null
+          comments: number | null
+          created_at: string | null
+          id: string | null
+          likes: number | null
+          payout_amount: number | null
+          payout_max_per_submission: number | null
+          payout_min_per_submission: number | null
+          platform: Database["public"]["Enums"]["platform_type"] | null
+          rate_per_1000_views: number | null
+          status: Database["public"]["Enums"]["submission_status"] | null
+          updated_at: string | null
+          user_id: string | null
+          views: number | null
+          was_approved: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_with_calculated_totals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      calculate_submission_earnings: {
+        Args: {
+          submission_views: number
+          campaign_rate: number
+          campaign_min: number
+          campaign_max: number
+          current_payout?: number
+        }
+        Returns: number
+      }
       check_campaign_dates: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -516,6 +910,52 @@ export type Database = {
           p_chat_id: string
         }
         Returns: string
+      }
+      get_campaign_calculated_total: {
+        Args: { campaign_id_param: string }
+        Returns: number
+      }
+      get_submissions_with_earnings_and_profiles: {
+        Args: { campaign_id_param: string; status_param?: string }
+        Returns: {
+          id: string
+          campaign_id: string
+          user_id: string
+          asset_url: string
+          status: string
+          views: number
+          likes: number
+          comments: number
+          payout_amount: number
+          calculated_earnings: number
+          created_at: string
+          updated_at: string
+          email: string
+          discord_username: string
+          country_code: string
+          platform: string
+        }[]
+      }
+      get_submissions_with_earnings_and_profiles_admin: {
+        Args: { campaign_id_param: string; status_param?: string }
+        Returns: {
+          id: string
+          campaign_id: string
+          user_id: string
+          asset_url: string
+          status: string
+          views: number
+          likes: number
+          comments: number
+          payout_amount: number
+          calculated_earnings: number
+          created_at: string
+          updated_at: string
+          email: string
+          discord_username: string
+          country_code: string
+          platform: string
+        }[]
       }
       get_submissions_with_profiles: {
         Args: { campaign_id_param: string; status_param?: string }

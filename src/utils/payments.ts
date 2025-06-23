@@ -319,6 +319,30 @@ async function processPaymentForSubmission(submission: any) {
         user_id: userId
       }
     });
+
+    // 6. Insert payment record into payments table
+    const { error: paymentInsertError } = await supabase
+      .from('payments')
+      .insert({
+        submission_id: submissionId,
+        campaign_id: campaignId,
+        user_id: userId,
+        amount: finalPaymentAmount,
+        views_paid: newViews,
+        rate_per_view: ratePerView,
+        stripe_transfer_id: transfer.id,
+        stripe_connect_id: profile.stripe_connect_id,
+        baseline_views: baselineViews,
+        highest_unpaid_view: highestUnpaidView.view_count,
+        description: `Payment for ${newViews} views on submission ${submissionId}`
+      });
+
+    if (paymentInsertError) {
+      console.error('Error inserting payment record:', paymentInsertError);
+      // Continue anyway as the Stripe payment was successful
+    } else {
+      console.log(`[Payment Processing] Successfully recorded payment of $${finalPaymentAmount} for submission ${submissionId}`);
+    }
     
     // Get the current values to ensure we're updating with the correct amounts
     const { data: currentSubmission } = await supabase
@@ -495,4 +519,5 @@ async function getHighestUnpaidView(supabase: any, submissionId: string): Promis
   console.log(`[Payment Debug] getHighestUnpaidView(${submissionId}) result:`, highestUnpaidView);
   
   return highestUnpaidView || null;
-} 
+}
+
