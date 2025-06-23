@@ -67,15 +67,42 @@ export async function processPayments() {
     return { success: true, message: 'No approved submissions found' };
   }
   
+  console.log(`[Payment Processing] Found ${submissions.length} approved submissions to process`);
+  
   let results = [];
+  let totalPaid = 0;
+  let successCount = 0;
+  let failureCount = 0;
   
   // Process each submission
   for (const submission of submissions) {
+    console.log(`[Payment Processing] Processing submission ${submission.id} (${submission.views} views)`);
     const result = await processPaymentForSubmission(submission);
+    
+    if (result.success && result.amount) {
+      totalPaid += result.amount;
+      successCount++;
+    } else if (!result.success) {
+      failureCount++;
+    } else {
+      successCount++; // Count "no new views" as success
+    }
+    
     results.push(result);
   }
   
-  return { success: true, results };
+  console.log(`[Payment Processing] Completed: ${successCount} success, ${failureCount} failed, $${totalPaid.toFixed(2)} total paid`);
+  
+  return { 
+    success: true, 
+    results,
+    summary: {
+      totalProcessed: submissions.length,
+      successCount,
+      failureCount,
+      totalPaid
+    }
+  };
 }
 
 /**
@@ -132,64 +159,7 @@ async function processPaymentForSubmission(submission: any) {
     };
   }
   
-  // Check if we're about to hit a budget breakpoint
-  if (campaign.budget_breakpoints && campaign.budget_breakpoints.length > 0) {
-    const currentBreakpointIndex = campaign.current_breakpoint_index || 0;
-    
-    // Only check if we haven't processed all breakpoints yet
-    if (currentBreakpointIndex < campaign.budget_breakpoints.length) {
-      const nextBreakpoint = campaign.budget_breakpoints[currentBreakpointIndex];
-      const currentTotal = Number(campaign.total_paid);
-      
-      // Get baseline and unpaid views to estimate payment
-      const baselineViews = await getBaselineViews(supabase, submissionId);
-      const highestUnpaidView = await getHighestUnpaidView(supabase, submissionId);
-      
-      if (highestUnpaidView) {
-        const newViews = Math.max(0, highestUnpaidView.view_count - baselineViews);
-        const ratePerView = Number(campaign.rate_per_1000_views) / 1000;
-        let estimatedPayment = Number((newViews * ratePerView).toFixed(2));
-        
-        // Apply max payout per submission limit if set
-        if (campaign.payout_max_per_submission && Number(campaign.payout_max_per_submission) > 0) {
-          const { data: currentSubmission } = await supabase
-            .from('submissions')
-            .select('payout_amount')
-            .eq('id', submissionId)
-            .single();
-          
-          const currentPayoutAmount = Number(currentSubmission?.payout_amount || 0);
-          const maxPayoutPerSubmission = Number(campaign.payout_max_per_submission);
-          const remainingAllowedPayout = Math.max(0, maxPayoutPerSubmission - currentPayoutAmount);
-          
-          estimatedPayment = Math.min(estimatedPayment, remainingAllowedPayout);
-        }
-        
-        // Apply campaign budget limit
-        estimatedPayment = Math.min(estimatedPayment, Number(campaign.budget) - currentTotal);
-        
-        // Check if this payment would cross the breakpoint
-        if (currentTotal + estimatedPayment >= nextBreakpoint) {
-          // Pause the campaign at this breakpoint
-          await supabase
-            .from('campaigns')
-            .update({
-              status: 'paused_at_breakpoint' as Database['public']['Enums']['campaign_status'],
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', campaignId);
-          
-          console.log(`Campaign ${campaignId} paused at breakpoint $${nextBreakpoint}`);
-          
-          return {
-            submissionId,
-            success: false,
-            error: `Campaign paused at breakpoint $${nextBreakpoint}`
-          };
-        }
-      }
-    }
-  }
+
   
   // Get the creator's Stripe Connect ID
   const { data: profile, error: profileError } = await supabase
@@ -208,26 +178,42 @@ async function processPaymentForSubmission(submission: any) {
   
   // 1. Get the highest paid view count (baseline) using our helper function
   const baselineViews = await getBaselineViews(supabase, submissionId);
+  console.log(`[Payment Debug] Submission ${submissionId}: Baseline views: ${baselineViews}`);
   
   // 2. Get the highest unpaid view count (current total) using our helper function  
   const highestUnpaidView = await getHighestUnpaidView(supabase, submissionId);
+  console.log(`[Payment Debug] Submission ${submissionId}: Highest unpaid view:`, highestUnpaidView);
   
   if (!highestUnpaidView) {
+    console.log(`[Payment Debug] Submission ${submissionId}: No eligible unpaid views found (all views < 3 days old or already paid)`);
     return { 
       submissionId, 
       success: true, 
-      message: 'No new views to pay for' 
+      message: 'No new views to pay for',
+      debug: {
+        baselineViews,
+        highestUnpaidView: null,
+        reason: 'No eligible unpaid views (< 3 days old)'
+      }
     };
   }
   
   // 3. Calculate new views
   const newViews = Math.max(0, highestUnpaidView.view_count - baselineViews);
+  console.log(`[Payment Debug] Submission ${submissionId}: New views = ${highestUnpaidView.view_count} - ${baselineViews} = ${newViews}`);
   
   if (newViews <= 0) {
+    console.log(`[Payment Debug] Submission ${submissionId}: No new views since baseline`);
     return { 
       submissionId, 
       success: true, 
-      message: 'No new views to pay for' 
+      message: 'No new views to pay for',
+      debug: {
+        baselineViews,
+        highestUnpaidView: highestUnpaidView.view_count,
+        newViews,
+        reason: 'No increase from baseline'
+      }
     };
   }
   
@@ -464,7 +450,7 @@ export async function processPaymentForSubmissionById(submissionId: string) {
  * Helper to get the highest paid view count (baseline views)
  */
 async function getBaselineViews(supabase: any, submissionId: string): Promise<number> {
-  const { data: highestPaidView } = await supabase
+  const { data: highestPaidView, error } = await supabase
     .from('view_history')
     .select('view_count')
     .eq('submission_id', submissionId)
@@ -473,7 +459,13 @@ async function getBaselineViews(supabase: any, submissionId: string): Promise<nu
     .limit(1)
     .single();
   
-  return highestPaidView ? highestPaidView.view_count : 0;
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+    console.error(`[Payment Debug] Error getting baseline views for ${submissionId}:`, error);
+  }
+  
+  const baseline = highestPaidView ? highestPaidView.view_count : 0;
+  console.log(`[Payment Debug] getBaselineViews(${submissionId}): ${baseline}`);
+  return baseline;
 }
 
 /**
@@ -484,15 +476,23 @@ async function getHighestUnpaidView(supabase: any, submissionId: string): Promis
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
   
-  const { data: highestUnpaidView } = await supabase
+  console.log(`[Payment Debug] getHighestUnpaidView(${submissionId}): Looking for views before ${threeDaysAgo.toISOString()}`);
+  
+  const { data: highestUnpaidView, error } = await supabase
     .from('view_history')
-    .select('view_count')
+    .select('view_count, created_at')
     .eq('submission_id', submissionId)
     .eq('paid', false)
     .lte('created_at', threeDaysAgo.toISOString()) // Only consider views at least 3 days old
     .order('view_count', { ascending: false })
     .limit(1)
     .single();
+  
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+    console.error(`[Payment Debug] Error getting unpaid views for ${submissionId}:`, error);
+  }
+  
+  console.log(`[Payment Debug] getHighestUnpaidView(${submissionId}) result:`, highestUnpaidView);
   
   return highestUnpaidView || null;
 } 
