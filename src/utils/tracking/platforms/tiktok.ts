@@ -57,7 +57,24 @@ export async function tiktokTracker(url: string): Promise<TikTokEngagement> {
       }
     }
 
-    // Method 1: Try Chinese tikwm.com API (PRIMARY METHOD)
+    // Check if this is a slideshow/photo URL - MUST use Chinese API
+    const isSlideshow = url.includes('/photo/')
+    
+    if (isSlideshow) {
+      console.log('🖼️ Detected TikTok slideshow/photo - MUST use Chinese API!')
+      
+      // For slideshows, try Chinese API with retries since original scraping doesn't work
+      const chineseResult = await tryChineseTikWMApiWithRetries(url, 3)
+      if (chineseResult.views !== null || chineseResult.likes !== null || chineseResult.comments !== null) {
+        console.log('✅ SUCCESS with Chinese tikwm.com API!')
+        return chineseResult
+      }
+      
+      console.log('❌ Chinese API failed for slideshow - original scraping cannot handle slideshows')
+      return { views: null, likes: null, comments: null }
+    }
+
+    // For regular videos, try Chinese API first
     console.log('🇨🇳 Trying Chinese tikwm.com API method...')
     const chineseResult = await tryChineseTikWMApi(url)
     if (chineseResult.views !== null || chineseResult.likes !== null || chineseResult.comments !== null) {
@@ -65,7 +82,7 @@ export async function tiktokTracker(url: string): Promise<TikTokEngagement> {
       return chineseResult
     }
 
-    // Method 2: Fallback to original scraping method
+    // Method 2: Fallback to original scraping method (only for videos)
     console.log('🔄 Falling back to original scraping method...')
     return await originalTiktokTracker(url)
 
@@ -112,6 +129,35 @@ async function tryChineseTikWMApi(url: string): Promise<TikTokEngagement> {
     console.error('❌ Chinese tikwm.com API error:', error)
     return { views: null, likes: null, comments: null }
   }
+}
+
+/**
+ * Chinese tikwm.com API method with retries for slideshow URLs
+ * Critical for /photo/ URLs since original scraping doesn't work for slideshows
+ */
+async function tryChineseTikWMApiWithRetries(url: string, maxRetries: number): Promise<TikTokEngagement> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`🔄 Chinese API attempt ${attempt}/${maxRetries}...`)
+    
+    const result = await tryChineseTikWMApi(url)
+    
+    // If we got data, return it
+    if (result.views !== null || result.likes !== null || result.comments !== null) {
+      return result
+    }
+    
+    // If this was the last attempt, return the failed result
+    if (attempt === maxRetries) {
+      console.log(`❌ Chinese API failed after ${maxRetries} attempts`)
+      return result
+    }
+    
+    // Wait 1.5 seconds before retry to respect rate limits
+    console.log('⏳ Waiting 1.5s before retry to respect rate limits...')
+    await new Promise(resolve => setTimeout(resolve, 1500))
+  }
+  
+  return { views: null, likes: null, comments: null }
 }
 
 /**

@@ -43,18 +43,18 @@ export async function trackAllEngagement() {
   const results = { tracked: 0, skipped: 0, error: 0 }
   
   try {
-    // Fetch all approved submissions that should be tracked
+    // Fetch all pending and approved submissions that should be tracked
     const { data: submissions, error } = await supabase
       .from('submissions')
-      .select('id, asset_url, platform, views, likes, comments, campaign_id')
-      .eq('status', 'approved')
+      .select('id, asset_url, platform, views, likes, comments, campaign_id, status')
+      .in('status', ['pending', 'approved'])
       .not('platform', 'is', null) // Skip submissions without a platform
     
     if (error) throw error
     
     if (!submissions || submissions.length === 0) {
-      console.log('No approved submissions to track')
-      return { ...results, message: 'No approved submissions to track' }
+      console.log('No pending or approved submissions to track')
+      return { ...results, message: 'No pending or approved submissions to track' }
     }
     
     console.log(`Found ${submissions.length} submissions to track`)
@@ -115,7 +115,7 @@ export async function processSubmission(submission: any) {
       }
     }
     
-    console.log(`Processing submission ${submission.id} (${platform}): ${submission.asset_url}`)
+    console.log(`Processing submission ${submission.id} (${platform}) [${submission.status}]: ${submission.asset_url}`)
     
     // Get the appropriate tracker
     const tracker = trackers[platform]
