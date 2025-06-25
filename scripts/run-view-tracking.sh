@@ -1,33 +1,47 @@
 #!/bin/bash
-# Run view tracking script
-
-# Create logs directory if it doesn't exist
-mkdir -p /Users/josemaldonado/Development/projects/whop/whop-workers/logs
+# Run engagement tracking script
 
 # Get current date for log files
 DATE=$(date +"%Y-%m-%d")
-LOG_FILE="/Users/josemaldonado/Development/projects/whop/whop-workers/logs/view-tracking-${DATE}.log"
-ERROR_LOG_FILE="/Users/josemaldonado/Development/projects/whop/whop-workers/logs/view-tracking-error-${DATE}.log"
 
-# Change to the project directory
-cd /Users/josemaldonado/Development/projects/whop
-
-# Load NVM if present
-if [ -s "$HOME/.nvm/nvm.sh" ]; then
-  . "$HOME/.nvm/nvm.sh"
-  nvm use 18 || nvm use --lts
+# Determine the correct project path based on environment
+if [ -d "/root/whop-workers" ]; then
+    # VPS environment
+    PROJECT_PATH="/root/whop-workers"
+    NODE_PATH="/root/.nvm/versions/node/v20.17.0/bin"
+    export PATH="$NODE_PATH:$PATH"
+elif [ -d "/Users/josemaldonado/Development/projects/whop/whop-workers" ]; then
+    # Local development environment
+    PROJECT_PATH="/Users/josemaldonado/Development/projects/whop/whop-workers"
+else
+    echo "Error: Could not find whop-workers directory"
+    exit 1
 fi
 
-# Add timestamp to log entry
-echo "[$(date +"%Y-%m-%d %H:%M:%S")] Starting view tracking job" | tee -a "$LOG_FILE" "$ERROR_LOG_FILE"
+# Change to project directory
+cd "$PROJECT_PATH" || exit 1
 
-# Run the script, logging stdout to log file and stderr to error log file
-npx ts-node whop-workers/scripts/track-views.ts 1>> "$LOG_FILE" 2>> "$ERROR_LOG_FILE"
+# Create logs directory if it doesn't exist
+mkdir -p "${PROJECT_PATH}/logs"
 
-# Log completion status
+# Log files for cron output (separate from the detailed logs created by the script itself)
+STDOUT_LOG_FILE="${PROJECT_PATH}/logs/engagement-tracking-stdout-${DATE}.log"
+ERROR_LOG_FILE="${PROJECT_PATH}/logs/engagement-tracking-error-${DATE}.log"
+
+# Add timestamp to cron output logs
+echo "[$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")] Starting engagement tracking cron job" >> "$STDOUT_LOG_FILE"
+
+# Run the tracking script
+# The script itself will create:
+# - engagement-tracking-detailed-YYYY-MM-DD.log (all detailed platform logs)
+# - engagement-tracking-YYYY-MM-DD.log (summary only)
+npx tsx scripts/track-views.ts >> "$STDOUT_LOG_FILE" 2>> "$ERROR_LOG_FILE"
+
+# Capture exit code
 EXIT_CODE=$?
-if [ $EXIT_CODE -eq 0 ]; then
-  echo "[$(date +"%Y-%m-%d %H:%M:%S")] View tracking job completed successfully (exit: $EXIT_CODE)" >> "$LOG_FILE"
-else
-  echo "[$(date +"%Y-%m-%d %H:%M:%S")] View tracking job failed with exit code: $EXIT_CODE" | tee -a "$LOG_FILE" "$ERROR_LOG_FILE"
-fi 
+
+# Add completion timestamp to cron output logs
+echo "[$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")] Engagement tracking cron job completed with exit code: $EXIT_CODE" >> "$STDOUT_LOG_FILE"
+
+# Exit with the same code as the tracking script
+exit $EXIT_CODE 
