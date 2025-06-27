@@ -42,7 +42,6 @@ function createServiceClient() {
 
 /**
  * Process payments for all submissions with unpaid views
- * Note: Payments are delayed by 3 days - only views that are at least 3 days old are eligible for payout
  */
 export async function processPayments() {
   // Database triggers now handle campaign state transitions based on dates
@@ -185,7 +184,7 @@ async function processPaymentForSubmission(submission: any) {
   console.log(`[Payment Debug] Submission ${submissionId}: Highest unpaid view:`, highestUnpaidView);
   
   if (!highestUnpaidView) {
-    console.log(`[Payment Debug] Submission ${submissionId}: No eligible unpaid views found (all views < 3 days old or already paid)`);
+    console.log(`[Payment Debug] Submission ${submissionId}: No eligible unpaid views found`);
     return { 
       submissionId, 
       success: true, 
@@ -193,7 +192,7 @@ async function processPaymentForSubmission(submission: any) {
       debug: {
         baselineViews,
         highestUnpaidView: null,
-        reason: 'No eligible unpaid views (< 3 days old)'
+        reason: 'No eligible unpaid views'
       }
     };
   }
@@ -362,16 +361,12 @@ async function processPaymentForSubmission(submission: any) {
     
     console.log(`Current campaign total_paid: ${currentTotalPaid}, adding payment: ${finalPaymentAmount}`);
     
-    // 6. Mark eligible (3+ days old) unpaid view records as paid
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    
+    // 6. Mark unpaid view records as paid
     const { error: updateViewsError } = await supabase
       .from('view_history')
       .update({ paid: true })
       .eq('submission_id', submissionId)
-      .eq('paid', false)
-      .lte('created_at', threeDaysAgo.toISOString()); // Only mark views as paid that are at least 3 days old
+      .eq('paid', false);
     
     if (updateViewsError) {
       console.error('Error updating view records:', updateViewsError);
@@ -493,21 +488,16 @@ async function getBaselineViews(supabase: any, submissionId: string): Promise<nu
 }
 
 /**
- * Helper to get the highest unpaid view record that is at least 3 days old
+ * Helper to get the highest unpaid view record
  */
 async function getHighestUnpaidView(supabase: any, submissionId: string): Promise<{view_count: number} | null> {
-  // Calculate the date 3 days ago
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  
-  console.log(`[Payment Debug] getHighestUnpaidView(${submissionId}): Looking for views before ${threeDaysAgo.toISOString()}`);
+  console.log(`[Payment Debug] getHighestUnpaidView(${submissionId}): Looking for unpaid views`);
   
   const { data: highestUnpaidView, error } = await supabase
     .from('view_history')
     .select('view_count, created_at')
     .eq('submission_id', submissionId)
     .eq('paid', false)
-    .lte('created_at', threeDaysAgo.toISOString()) // Only consider views at least 3 days old
     .order('view_count', { ascending: false })
     .limit(1)
     .single();
