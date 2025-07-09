@@ -50,11 +50,14 @@ export async function processPayments() {
   const supabase = createServiceClient();
   
   // 1. Get all submissions with approved status for active campaigns
+  // TEMPORARY: Also include the old Lovable UGC campaign even if paused
+  const OLD_LOVABLE_CAMPAIGN_ID = '2ddb8f26-554d-499c-ab68-f7d44e539a1c';
+  
   const { data: submissions, error: submissionsError } = await supabase
     .from('submissions')
     .select('*, campaigns(*)')
     .eq('status', 'approved')
-    .eq('campaigns.status', 'active');
+    .or(`campaigns.status.eq.active,campaigns.id.eq.${OLD_LOVABLE_CAMPAIGN_ID}`);
   
   if (submissionsError) {
     console.error('Error fetching submissions:', submissionsError);
@@ -141,7 +144,10 @@ async function processPaymentForSubmission(submission: any) {
   }
   
   // Check campaign status
-  if (campaign.status !== 'active') {
+  // TEMPORARY: Allow old Lovable UGC campaign to process payments even if paused
+  const OLD_LOVABLE_CAMPAIGN_ID = '2ddb8f26-554d-499c-ab68-f7d44e539a1c';
+  
+  if (campaign.status !== 'active' && campaign.id !== OLD_LOVABLE_CAMPAIGN_ID) {
     return { 
       submissionId, 
       success: false, 
@@ -256,17 +262,17 @@ async function processPaymentForSubmission(submission: any) {
     }
   }
   
-  // Check if payment would exceed campaign budget
+  // Check if payment would exceed campaign budget (no partial payments)
   const remainingBudget = Number(campaign.budget) - Number(campaign.total_paid);
-  let finalPaymentAmount = Math.min(paymentAmount, remainingBudget);
-  
-  if (finalPaymentAmount <= 0) {
+  if (paymentAmount > remainingBudget) {
     return { 
       submissionId, 
       success: false, 
-      error: 'Campaign budget exhausted' 
+      error: `Insufficient campaign budget remaining. Need $${paymentAmount.toFixed(2)}, have $${remainingBudget.toFixed(2)}` 
     };
   }
+  
+  let finalPaymentAmount = paymentAmount; // Use full amount, no partial payments
   
   // Check if payment would exceed max payout per submission (if set)
   if (campaign.payout_max_per_submission && Number(campaign.payout_max_per_submission) > 0) {
