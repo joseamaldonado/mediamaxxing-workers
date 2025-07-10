@@ -50,14 +50,11 @@ export async function processPayments() {
   const supabase = createServiceClient();
   
   // 1. Get all submissions with approved status for active campaigns
-  // TEMPORARY: Also include the old Lovable UGC campaign even if paused
-  const OLD_LOVABLE_CAMPAIGN_ID = '2ddb8f26-554d-499c-ab68-f7d44e539a1c';
-  
   const { data: submissions, error: submissionsError } = await supabase
     .from('submissions')
     .select('*, campaigns(*)')
     .eq('status', 'approved')
-    .or(`campaigns.status.eq.active,campaigns.id.eq.${OLD_LOVABLE_CAMPAIGN_ID}`);
+    .eq('campaigns.status', 'active');
   
   if (submissionsError) {
     console.error('Error fetching submissions:', submissionsError);
@@ -144,10 +141,7 @@ async function processPaymentForSubmission(submission: any) {
   }
   
   // Check campaign status
-  // TEMPORARY: Allow old Lovable UGC campaign to process payments even if paused
-  const OLD_LOVABLE_CAMPAIGN_ID = '2ddb8f26-554d-499c-ab68-f7d44e539a1c';
-  
-  if (campaign.status !== 'active' && campaign.id !== OLD_LOVABLE_CAMPAIGN_ID) {
+  if (campaign.status !== 'active') {
     return { 
       submissionId, 
       success: false, 
